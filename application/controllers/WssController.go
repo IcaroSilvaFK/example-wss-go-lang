@@ -1,14 +1,24 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
+type Client struct {
+	clientId string
+	conn     *websocket.Conn
+}
+
+type MessagePayload struct {
+	ClientId string
+	Message  string
+}
+
 type Room struct {
-	clients []*websocket.Conn
+	clients []Client
 }
 
 var upgrader = websocket.Upgrader{
@@ -29,11 +39,19 @@ func NewWssController(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close()
-	room.clients = append(room.clients, conn)
+	userId := uuid.NewString()
+	room.clients = append(room.clients, Client{clientId: userId, conn: conn})
+
+	conn.WriteJSON(MessagePayload{
+		ClientId: userId,
+		Message:  "Connected",
+	})
 
 	for {
 
-		_, message, err := conn.ReadMessage()
+		var message MessagePayload
+
+		err := conn.ReadJSON(&message)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -41,15 +59,16 @@ func NewWssController(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		msg := string(message)
-
-		fmt.Println(msg)
-
 		for _, client := range room.clients {
-			if err := client.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				break
+
+			if message.ClientId != client.clientId {
+
+				if err := client.conn.WriteJSON(message); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					break
+				}
 			}
+
 		}
 	}
 
