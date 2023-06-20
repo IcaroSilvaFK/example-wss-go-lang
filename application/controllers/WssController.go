@@ -13,8 +13,8 @@ type Client struct {
 }
 
 type MessagePayload struct {
-	ClientId string
-	Message  string
+	ClientId string `json:"client_id"`
+	Message  string `json:"message"`
 }
 
 type Room struct {
@@ -62,7 +62,6 @@ func NewWssController(w http.ResponseWriter, r *http.Request) {
 		for _, client := range room.clients {
 
 			if message.ClientId != client.clientId {
-
 				if err := client.conn.WriteJSON(message); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					break
